@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="命运塔·首登者 - Web4.0下一代去中心化卡牌对战游戏">
+    <meta name="keywords" content="命运塔,卡牌游戏,Web4,区块链游戏,锦标赛,NFT">
+    <meta name="theme-color" content="#1a1a2e">
+    
+    <title>命运塔·首登者 | Tower of Fate V1.3.12</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'tower-dark': '#0a0a1a',
+                        'tower-card': '#1a1a2e',
+                        'tower-gold': '#ffd700',
+                        'tower-silver': '#c0c0c0',
+                        'tower-bronze': '#cd7f32',
+                        'tower-accent': '#e94560',
+                        'tower-success': '#00d9ff',
+                    },
+                    fontFamily: {
+                        'display': ['Cinzel', 'serif'],
+                        'body': ['Noto Sans SC', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 5px #ffd700, 0 0 10px #ffd700' },
+                            '100%': { boxShadow: '0 0 20px #ffd700, 0 0 30px #ffd700' },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .font-display {
+            font-family: 'Cinzel', serif;
+        }
+        
+        .card-shadow {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 
+                        0 0 0 1px rgba(255, 215, 0, 0.1);
+        }
+        
+        .btn-tower {
+            background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-tower:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(233, 69, 96, 0.4);
+        }
+        
+        .glass-panel {
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 215, 0, 0.1);
+        }
+        
+        .playing-card {
+            width: 60px;
+            height: 84px;
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .playing-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        
+        .playing-card.red {
+            color: #e74c3c;
+        }
+        
+        .playing-card.black {
+            color: #2c3e50;
+        }
+        
+        .tower-level {
+            position: relative;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            margin: 5px 0;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        
+        .tower-level.current {
+            background: linear-gradient(90deg, rgba(233, 69, 96, 0.3) 0%, transparent 100%);
+            border-left: 4px solid #e94560;
+        }
+        
+        .tower-level.defeated {
+            opacity: 0.5;
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 215, 0, 0.3);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 215, 0, 0.5);
+        }
+        
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .playing-card {
+                width: 48px;
+                height: 67px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- 导航栏 -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-tower-gold/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <span class="text-3xl">🏰</span>
+                    <div>
+                        <h1 class="font-display text-xl font-bold text-tower-gold">命运塔</h1>
+                        <p class="text-xs text-gray-400">Tower of Fate</p>
+                    </div>
+                </div>
+                
+                <!-- 导航菜单 -->
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="#game" class="text-gray-300 hover:text-tower-gold transition">游戏</a>
+                    <a href="#tournament" class="text-gray-300 hover:text-tower-gold transition">锦标赛</a>
+                    <a href="#ranking" class="text-gray-300 hover:text-tower-gold transition">排行榜</a>
+                    <a href="#wallet" class="text-gray-300 hover:text-tower-gold transition">钱包</a>
+                </div>
+                
+                <!-- 用户状态 -->
+                <div class="flex items-center space-x-4">
+                    <div id="connection-status" class="flex items-center space-x-2 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-red-500" id="status-dot"></span>
+                        <span class="text-gray-400">离线</span>
+                    </div>
+                    <button id="login-btn" class="btn-tower px-4 py-2 rounded-lg text-sm font-medium">
+                        登录
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="pt-20 pb-8 px-4">
+        <div class="max-w-7xl mx-auto">
+            <!-- 欢迎区域 -->
+            <section id="welcome" class="text-center py-12">
+                <h2 class="font-display text-4xl md:text-6xl font-bold mb-4">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-tower-gold to-tower-success">
+                        命运塔·首登者
+                    </span>
+                </h2>
+                <p class="text-gray-400 text-lg mb-8 max-w-2xl mx-auto">
+                    Web4.0 下一代去中心化卡牌对战游戏<br>
+                    208张牌 · 13层塔楼 · 18位AI对手 · 196国锦标赛
+                </p>
+                
+                <!-- 快速操作 -->
+                <div class="flex flex-wrap justify-center gap-4 mb-12">
+                    <button onclick="createGame()" class="btn-tower px-8 py-4 rounded-xl text-lg font-bold flex items-center space-x-2">
+                        <i class="fas fa-play"></i>
+                        <span>快速开始</span>
+                    </button>
+                    <button onclick="showTournaments()" class="px-8 py-4 rounded-xl text-lg font-bold border border-tower-gold/30 hover:bg-tower-gold/10 transition flex items-center space-x-2">
+                        <i class="fas fa-trophy"></i>
+                        <span>锦标赛</span>
+                    </button>
+                    <button onclick="showWallet()" class="px-8 py-4 rounded-xl text-lg font-bold border border-tower-gold/30 hover:bg-tower-gold/10 transition flex items-center space-x-2">
+                        <i class="fas fa-wallet"></i>
+                        <span>充值</span>
+                    </button>
+                </div>
+                
+                <!-- 统计数据 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+                    <div class="glass-panel rounded-xl p-4">
+                        <div class="text-2xl font-bold text-tower-gold" id="stat-online">0</div>
+                        <div class="text-sm text-gray-400">在线玩家</div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-4">
+                        <div class="text-2xl font-bold text-tower-success" id="stat-games">0</div>
+                        <div class="text-sm text-gray-400">进行中</div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-4">
+                        <div class="text-2xl font-bold text-tower-accent">196</div>
+                        <div class="text-sm text-gray-400">国家/地区</div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-4">
+                        <div class="text-2xl font-bold text-purple-400">6</div>
+                        <div class="text-sm text-gray-400">加密货币</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 游戏区域 -->
+            <section id="game-section" class="hidden">
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <!-- 游戏主区域 -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- 游戏信息 -->
+                        <div class="glass-panel rounded-xl p-4 flex justify-between items-center">
+                            <div>
+                                <span class="text-gray-400">回合</span>
+                                <span class="text-2xl font-bold ml-2" id="game-round">1</span>
+                            </div>
+                            <div class="text-center">
+                                <span class="text-gray-400">当前玩家</span>
+                                <div class="text-xl font-bold text-tower-gold" id="current-player">-</div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-gray-400">倒计时</span>
+                                <div class="text-2xl font-bold text-tower-accent" id="turn-timer">30</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 弃牌堆 -->
+                        <div class="glass-panel rounded-xl p-6 text-center">
+                            <p class="text-gray-400 mb-4">当前顶牌</p>
+                            <div id="top-card" class="playing-card mx-auto text-2xl">
+                                <span>?</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 玩家手牌 -->
+                        <div class="glass-panel rounded-xl p-6">
+                            <p class="text-gray-400 mb-4">我的手牌</p>
+                            <div id="player-hand" class="flex flex-wrap justify-center gap-3">
+                                <!-- 动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 塔楼和玩家 -->
+                    <div class="space-y-6">
+                        <!-- 塔楼 -->
+                        <div class="glass-panel rounded-xl p-4">
+                            <h3 class="font-display text-lg font-bold text-tower-gold mb-4">命运之塔</h3>
+                            <div id="tower-display" class="space-y-1">
+                                <!-- 动态生成13层 -->
+                            </div>
+                        </div>
+                        
+                        <!-- 玩家列表 -->
+                        <div class="glass-panel rounded-xl p-4">
+                            <h3 class="font-display text-lg font-bold text-tower-gold mb-4">玩家</h3>
+                            <div id="player-list" class="space-y-2">
+                                <!-- 动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 游戏列表 -->
+            <section id="lobby-section" class="py-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-display text-2xl font-bold">游戏大厅</h3>
+                    <button onclick="createGame()" class="btn-tower px-4 py-2 rounded-lg">
+                        <i class="fas fa-plus mr-2"></i>创建房间
+                    </button>
+                </div>
+                <div id="game-list" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- 动态生成 -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 登录弹窗 -->
+    <div id="login-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/70" onclick="closeModal('login-modal')"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+            <div class="glass-panel rounded-2xl p-8">
+                <h3 class="font-display text-2xl font-bold text-center mb-6">进入命运塔</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-gray-400 mb-2">玩家昵称</label>
+                        <input type="text" id="player-name" class="w-full bg-tower-dark border border-gray-700 rounded-lg px-4 py-3 focus:border-tower-gold focus:outline-none" placeholder="输入你的昵称">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 mb-2">国家/地区</label>
+                        <select id="player-country" class="w-full bg-tower-dark border border-gray-700 rounded-lg px-4 py-3 focus:border-tower-gold focus:outline-none">
+                            <option value="CN">🇨🇳 中国</option>
+                            <option value="US">🇺🇸 美国</option>
+                            <option value="JP">🇯🇵 日本</option>
+                            <option value="KR">🇰🇷 韩国</option>
+                            <option value="GB">🇬🇧 英国</option>
+                            <option value="DE">🇩🇪 德国</option>
+                            <option value="FR">🇫🇷 法国</option>
+                            <option value="OTHERS">其他国家</option>
+                        </select>
+                    </div>
+                    <button onclick="login()" class="btn-tower w-full py-3 rounded-lg font-bold">
+                        开始冒险
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Socket.IO 连接
+        let socket = null;
+        let currentGameId = null;
+        let currentPlayerId = null;
+        let playerData = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            connectSocket();
+            loadGameList();
+            initTowerDisplay();
+        });
+
+        // 连接服务器
+        function connectSocket() {
+            const serverUrl = window.location.origin;
+            socket = io(serverUrl);
+            
+            socket.on('connect', () => {
+                updateConnectionStatus(true);
+                console.log('Connected to server');
+            });
+            
+            socket.on('disconnect', () => {
+                updateConnectionStatus(false);
+                console.log('Disconnected from server');
+            });
+            
+            // 游戏事件监听
+            setupGameEventListeners();
+        }
+
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('status-dot');
+            const text = dot.nextElementSibling;
+            
+            if (connected) {
+                dot.classList.remove('bg-red-500');
+                dot.classList.add('bg-green-500');
+                text.textContent = '在线';
+            } else {
+                dot.classList.remove('bg-green-500');
+                dot.classList.add('bg-red-500');
+                text.textContent = '离线';
+            }
+        }
+
+        // 登录
+        document.getElementById('login-btn').addEventListener('click', () => {
+            showModal('login-modal');
+        });
+
+        function login() {
+            const name = document.getElementById('player-name').value.trim();
+            const country = document.getElementById('player-country').value;
+            
+            if (!name) {
+                alert('请输入昵称');
+                return;
+            }
+            
+            playerData = { name, country };
+            
+            socket.emit('login', playerData, (response) => {
+                if (response.success) {
+                    currentPlayerId = response.playerId;
+                    document.getElementById('login-btn').textContent = name;
+                    closeModal('login-modal');
+                }
+            });
+        }
+
+        // 创建游戏
+        function createGame() {
+            if (!currentPlayerId) {
+                showModal('login-modal');
+                return;
+            }
+            
+            socket.emit('create_game', { maxPlayers: 4, numDecks: 4 }, (response) => {
+                if (response.success) {
+                    currentGameId = response.gameId;
+                    joinGame(currentGameId);
+                }
+            });
+        }
+
+        // 加入游戏
+        function joinGame(gameId) {
+            socket.emit('join_game', { gameId }, (response) => {
+                if (response.success) {
+                    currentGameId = gameId;
+                    showGameSection();
+                    updateGameState(response.gameState);
+                }
+            });
+        }
+
+        // 显示游戏区域
+        function showGameSection() {
+            document.getElementById('welcome').classList.add('hidden');
+            document.getElementById('lobby-section').classList.add('hidden');
+            document.getElementById('game-section').classList.remove('hidden');
+        }
+
+        // 更新游戏状态
+        function updateGameState(state) {
+            // 更新回合信息
+            document.getElementById('game-round').textContent = state.round;
+            
+            // 更新顶牌
+            if (state.topCard) {
+                const topCardEl = document.getElementById('top-card');
+                topCardEl.className = `playing-card mx-auto text-2xl ${state.topCard.isRed ? 'red' : 'black'}`;
+                topCardEl.innerHTML = `
+                    <span>${state.topCard.suit}</span>
+                    <span>${state.topCard.rank}</span>
+                `;
+            }
+            
+            // 更新玩家列表
+            updatePlayerList(state.players);
+            
+            // 更新塔楼状态
+            updateTowerState(state.tower);
+            
+            // 更新当前玩家
+            const currentPlayer = state.players.find(p => p.id === state.currentPlayerId);
+            if (currentPlayer) {
+                document.getElementById('current-player').textContent = currentPlayer.name;
+            }
+        }
+
+        // 更新玩家列表
+        function updatePlayerList(players) {
+            const container = document.getElementById('player-list');
+            container.innerHTML = players.map(p => `
+                <div class="flex items-center justify-between p-3 rounded-lg ${p.id === currentPlayerId ? 'bg-tower-gold/20' : 'bg-tower-dark'}">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl">${p.isAI ? '🤖' : '👤'}</span>
+                        <div>
+                            <div class="font-medium">${p.name}</div>
+                            <div class="text-xs text-gray-400">Lv.${p.level} | 手牌:${p.handCount}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-tower-gold font-bold">${p.position}步</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 更新我的手牌
+            const me = players.find(p => p.id === currentPlayerId);
+            if (me && me.hand) {
+                updatePlayerHand(me.hand);
+            }
+        }
+
+        // 更新手牌显示
+        function updatePlayerHand(hand) {
+            const container = document.getElementById('player-hand');
+            container.innerHTML = hand.map(card => `
+                <div class="playing-card ${card.isRed ? 'red' : 'black'}" 
+                     onclick="playCard('${card.id}')">
+                    <span>${card.suit}</span>
+                    <span>${card.rank}</span>
+                </div>
+            `).join('');
+        }
+
+        // 出牌
+        function playCard(cardId) {
+            if (!currentGameId) return;
+            
+            socket.emit('play_card', { gameId: currentGameId, cardId }, (response) => {
+                if (!response.success) {
+                    console.error('Play card failed:', response.error);
+                }
+            });
+        }
+
+        // 初始化塔楼显示
+        function initTowerDisplay() {
+            const container = document.getElementById('tower-display');
+            const guardNames = [
+                '命运守卫·终焉', '神卫·审判', '龙卫·咆哮', '暗卫·深渊',
+                '光卫·圣盾', '水卫·潮汐', '岩卫·坚壁', '风卫·疾行',
+                '雷卫·风暴', '冰卫·霜冻', '炎卫·烈焰', '影卫·暗杀', '铁卫·塔盾'
+            ];
+            
+            container.innerHTML = guardNames.map((name, index) => `
+                <div class="tower-level bg-tower-dark" data-level="${13 - index}">
+                    <span class="text-gray-400 text-sm">Lv.${13 - index}</span>
+                    <span class="font-medium text-sm">${name}</span>
+                    <span class="text-tower-gold">🏰</span>
+                </div>
+            `).join('');
+        }
+
+        // 更新塔楼状态
+        function updateTowerState(tower) {
+            if (!tower) return;
+            
+            const levels = document.querySelectorAll('.tower-level');
+            tower.guards.forEach((guard, index) => {
+                const levelEl = levels[12 - index]; // 倒序显示
+                if (levelEl) {
+                    levelEl.classList.toggle('defeated', guard.defeated);
+                    levelEl.classList.toggle('current', guard.level === tower.current);
+                }
+            });
+        }
+
+        // 设置游戏事件监听
+        function setupGameEventListeners() {
+            socket.on('game_started', (data) => {
+                console.log('Game started:', data);
+                updateGameState({
+                    round: 1,
+                    topCard: data.firstCard,
+                    players: data.players,
+                    tower: data.tower,
+                    currentPlayerId: data.players[0].id
+                });
+            });
+            
+            socket.on('turn_started', (data) => {
+                document.getElementById('current-player').textContent = data.playerName;
+                startTurnTimer(data.timeout / 1000);
+            });
+            
+            socket.on('card_played', (data) => {
+                updateGameState({
+                    round: data.round,
+                    topCard: data.currentTopCard,
+                    players: data.players,
+                    tower: data.tower
+                });
+            });
+            
+            socket.on('game_ended', (data) => {
+                alert(`游戏结束！获胜者：${data.winner.name}`);
+                location.reload();
+            });
+            
+            socket.on('cards_drawn', (data) => {
+                if (data.playerId === currentPlayerId) {
+                    // 刷新手牌
+                    socket.emit('get_game_state', { gameId: currentGameId }, (res) => {
+                        if (res.success) {
+                            updateGameState(res.state);
+                        }
+                    });
+                }
+            });
+        }
+
+        // 回合计时器
+        let turnTimerInterval = null;
+        function startTurnTimer(seconds) {
+            if (turnTimerInterval) {
+                clearInterval(turnTimerInterval);
+            }
+            
+            let remaining = seconds;
+            const timerEl = document.getElementById('turn-timer');
+            
+            turnTimerInterval = setInterval(() => {
+                remaining--;
+                timerEl.textContent = remaining;
+                
+                if (remaining <= 0) {
+                    clearInterval(turnTimerInterval);
+                }
+            }, 1000);
+        }
+
+        // 加载游戏列表
+        async function loadGameList() {
+            try {
+                const response = await fetch('/api/games');
+                const games = await response.json();
+                
+                const container = document.getElementById('game-list');
+                if (games.length === 0) {
+                    container.innerHTML = `
+                        <div class="col-span-full text-center py-12 text-gray-400">
+                            <i class="fas fa-inbox text-4xl mb-4"></i>
+                            <p>暂无进行中的游戏</p>
+                            <button onclick="createGame()" class="btn-tower px-6 py-2 rounded-lg mt-4">
+                                创建新游戏
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = games.map(game => `
+                    <div class="glass-panel rounded-xl p-4 card-shadow">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h4 class="font-bold">游戏 #${game.id.substr(-6)}</h4>
+                                <span class="text-sm text-gray-400">${game.state === 'waiting' ? '等待中' : '准备就绪'}</span>
+                            </div>
+                            <span class="text-tower-gold">${game.players}/${game.maxPlayers}</span>
+                        </div>
+                        <button onclick="joinGame('${game.id}')" class="btn-tower w-full py-2 rounded-lg" ${game.players >= game.maxPlayers ? 'disabled' : ''}>
+                            ${game.players >= game.maxPlayers ? '已满' : '加入'}
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load games:', error);
+            }
+        }
+
+        // 模态框控制
+        function showModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // 其他功能
+        function showTournaments() {
+            alert('锦标赛功能即将开放');
+        }
+
+        function showWallet() {
+            alert('钱包功能：\n\nUSDT (TRC20): TUKf5QXj8nvNhsqy2va8gCnRoG77wKVwwC\n\nBNB (BEP20): 0x6b107f2a17f218df01367f94c4a77758ba9cb4df\n\nETH (ERC20): 0x6b107f2a17f218df01367f94c4a77758ba9cb4df\n\nSOL: BYQsmcAq16BQ1K7CUphfuQJephJrDNbm3NVXtsLG6tyN\n\nBTC (Taproot): bc1pnjg9z5el0xt3uzm82symufy3lm56x82vg75dv7xm4eqvvec6j45sx9xzs0');
+        }
+    </script>
+</body>
+</html>
